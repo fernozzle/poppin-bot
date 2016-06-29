@@ -1,0 +1,10 @@
+{
+    "compilerOptions": {
+        "target": "es6",
+        "sourceMap": true,
+        "watch": true,
+        "outDir": "build",
+        "removeComments": true,
+        "module": "commonjs"
+    }
+}
