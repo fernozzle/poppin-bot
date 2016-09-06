@@ -46,12 +46,13 @@ export default class Messager {
     type(channel: Channelesque, texts: (string | string[])) {
         if (texts.length === 0) return Promise.resolve(null);
 
-        return typeit((typeof texts === 'string') ? [texts] : texts);
-
-        function typeit(remain: string[]) {
+        const typeit = (remain: string[]) => {
             if (remain.length === 0) return Promise.resolve();
             return this.send(channel, remain[0]).then(() => typeit(remain.slice(1)));
-        }
+        };
+
+        return typeit((typeof texts === 'string') ? [texts] : texts);
+
 
         // client.startTyping(channel);
         // return new Promise(function(resolve, reject) {

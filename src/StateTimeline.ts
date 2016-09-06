@@ -2,10 +2,14 @@ import * as firebase from 'firebase';
 import {mapObject} from './Util'
 
 /**
- * Returns `optional` but `fallback` when it's undefined
+ * Returns `optional` but `fallback` when it's undefined/null
  */
 function fallback(optional, fallback) {
-    return (optional !== undefined) ? optional : fallback;
+    return (
+        optional !== undefined &&
+        optional !== null &&
+        optional !== ''
+    ) ? optional : fallback;
 }
 /**
  * Note that the returned list of keys is a subset
@@ -13,22 +17,24 @@ function fallback(optional, fallback) {
  */
 function deltaKeys(newProps:{}, oldProps:{}) {
     return Object.keys(newProps).filter(
-        key => newProps[key] !== oldProps[key]);
+        key => fallback(newProps[key], undefined) !==
+               fallback(oldProps[key], undefined));
 }
 function applyProps(source:{}, target:{}, keys:string[]) {
-    for (const key in keys) {
+    for (const key of keys) {
         if (source[key] === undefined) delete target[key];
         else target[key] = source[key];
     }
 }
 
+const NONE = Number.MIN_VALUE;
 const Keys = Object.freeze({
     ACCESS: 'access',
 });
 const Status = Object.freeze({
     ONLINE: 'online',
     OFFLINE: 'offline',
-    FOREIGN: ''
+    FOREIGN: NONE
 });
 
 export default class StateTimeline {
@@ -83,14 +89,15 @@ export default class StateTimeline {
                 updateObject[leavent] = Status.ONLINE;
             }
 
-            const changedKeys = [ // New keys that are different...
+            const changedKeys = [
+                // New keys that are different...
                 ...deltaKeys(allProps, this.state),
                 // and old keys that don't exist anymore
                 ...deltaKeys(this.state, allProps)
             ]; // Many duplicates, doesn't matter with mapObject
             this.buildEvent(
                 allProps, this.state,
-                changedKeys, now,
+                changedKeys, now, null,
                 updateObject);
 
             applyProps(allProps, this.state, changedKeys);
@@ -101,9 +108,10 @@ export default class StateTimeline {
     update(newProps:{}, time = Date.now()) {
         return this.gotReady.then(() => {
             const changedKeys = deltaKeys(newProps, this.state);
+            console.log(changedKeys.map(key => key + ':\n\t' + this.state[key] + ' => ' + newProps[key]).join('\n'));
             const updateObject = this.buildEvent(
                 newProps, this.state,
-                changedKeys, time);
+                changedKeys, time, NONE);
 
             applyProps(newProps, this.state, changedKeys);
             return this.root.update(updateObject);
@@ -122,13 +130,12 @@ export default class StateTimeline {
 
 
     private buildEvent(
-        newProps:{}, oldProps:{},
-        keys:string[], time:number,
-        updateObject = {}) {
+        newProps:{}, oldProps:{}, keys:string[],
+        time:number, oldNone, updateObject = {}) {
 
         mapObject(keys,
             key => this.eventID(key, time),
-            key => fallback(oldProps[key], ''),
+            key => fallback(oldProps[key], oldNone),
             updateObject);
         return mapObject(keys,
             key => this.stateID(key),

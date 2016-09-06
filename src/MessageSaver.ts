@@ -67,7 +67,7 @@ export default class MessageSaver {
             message.editedTimestamp || null;
         // SWEAR
         updateObject[messageID(NS.SWEAR, message)] =
-            swearFilter.isProfane(message.content);
+            swearFilter.isProfane(message.content) || null;
         // MENTIONS
         updateObject[messageID(NS.MENTIONS, message)] =
             mapObject(message.mentions, u => u.id, u => true);
@@ -77,9 +77,7 @@ export default class MessageSaver {
 
         if (oldMessage) { // This is an update
             // Previous TOLD
-            const prevTime =
-                oldMessage.editedTimestamp ||
-                oldMessage.timestamp;
+            const prevTime = message.editedTimestamp;
             const told = messageID(NS.TOLD, oldMessage);
             updateObject[told + '/' + prevTime] = oldMessage.content;
 
