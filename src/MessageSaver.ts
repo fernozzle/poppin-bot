@@ -62,7 +62,7 @@ export default class MessageSaver {
         message:Mess, updateObject:{}, oldMessage?:Mess) {
 
         // BASE edit timestamp
-        const base = messageID(NS.BASE, oldMessage);
+        const base = messageID(NS.BASE, message);
         updateObject[base + '/edit'] =
             message.editedTimestamp || null;
         // SWEAR

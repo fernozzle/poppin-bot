@@ -88,92 +88,8 @@ function selectServer(query:string, message:Discord.Message, {permission, missin
         resolve(foundServer);
     });
 }
+/*
 const commands = {
-    'leave': function(tail:string, message:Discord.Message, {announce = true} = {}) {
-        const options = {
-            permission: "manageServer",
-            missing: [
-                `Could you repeat that with a server name or ID?`,
-                `You could also type \`@${client.user.name} stop\` in the server itself.`,
-                `Or you could just kick me from the server`
-            ],
-            unprivileged: (server:Discord.Server) => [
-                `Sorry ${message.author}, you have to be a mod (who can "manage server")`,
-                `to pull the plug. My rampage on ${server.name} continues`
-            ]
-        };
-        return selectServer(tail, message, options).then(server => {
-            // All good
-            const lines = [
-                `All right ${message.author}, I'm disconnecting from ${server.name}.`,
-                `I'll be stalking your members no longer`,
-                `I'M OUT`
-            ];
-            if (!message.server) messager.type(message.author, lines); // PM? Tell em
-            const leave = () => server.leave();
-            return (announce ? messager.type(server, lines) : Promise.resolve(null)).then(leave);
-        }).catch(error => {
-            loggy.error(`Error leaving a server ${Emoji.MORE}`, error)
-        });
-    },
-    'silently-leave': function(tail:string, message:Discord.Message) {
-        return this['leave'](tail, message, {announce: false});
-    },
-
-    // throwIfUnable is true for command-less callings, gives a dumb response on catch
-    'join': function(tail:string, message:Discord.Message, {throwIfUnable = false, announce = true} = {}) {
-        if (!tail) {
-            if (throwIfUnable) return Promise.reject(`No invite URL given`);
-            return messager.type(message, `Repeat that with an invite URL after it!`);
-        }
-
-        const serversOld = client.servers.slice();
-        const name = message.author.name;
-        return new Promise((resolve, reject) => (/^http/.test(tail) ? resolve : reject)())
-        .then(() => client.joinServer(tail))
-        .then(server => { // It's an invite!
-            if (serversOld.indexOf(server) !== -1) {
-                return messager.type(message, [
-                    `Thanks for the invite ${name}`,
-                    `It was very good and it worked`,
-                    `But I'm already on ${server.name}!`,
-                    `Check it out: ${getLiveUrl(server.id)}`
-                ]);
-            }
-            loggy.log(`${Emoji.JOIN} Used invite ${tail} to join server ${server.name}, which has ${server.members.length} members`);
-            const thank = messager.type(message, pick(
-                `Dam ${name} you just got me into ${server.name} imma check out whats poppin in there`,
-                `O shingle waddup ${name} its ${server.name} thanks for the invite`,
-                `Woah is this ${server.name}? Thank you so much for the invite ${name}`
-            ));
-            root.child(`invites/${server.id}`).push(tail);
-            if (!announce) return thank;
-
-            const serverRef = root.child(`servers/${server.id}`);
-            return thank.then(() => serverRef.once('value'))
-            .then(serverSnap => {
-                // Server join is handled by the `serverCreated` listener
-                return messager.type(server, !serverSnap.exists() ? [
-                    `Hi I'm ${client.user.name}, and ${message.author} sent me here`,
-                    `I make live dot plots of your server's activity stats so you can always see which channels are POPPIN.`,
-                    `Here's the graph for ${server.name}: ${getLiveUrl(server.id)}`
-                ] : [
-                    `Hi I'm ${client.user.name} and ${message.author} has brought me back`,
-                    `Once again, my live dot plot of ${server.name} is at ${getLiveUrl(server.id)}`
-                ])
-            });
-        }).catch(() => {
-            if (throwIfUnable) throw `Couldn't join invite`;
-            loggy.error(`Couldn't join server from the invite ${tail}`);
-            return messager.type(message, [
-                `I couldn't use that as an invite.`,
-                `(Is ${tail} an invite? Am I banned?)`
-            ]);
-        });
-    },
-    'silently-join': function(tail:string, message:Discord.Message) {
-        return this['join'](tail, message, {announce: false});
-    },
     'list': function(tail:string, message:Discord.Message) {
         if (!userCan(message.author)) {
             return messager.type(message, `${Emoji.ERROR} You don't have permission to do list em off`);
@@ -270,8 +186,19 @@ const commands = {
             .then(() => messager.type(message, `${Emoji.OBLITERATE} Cleared messages on ${name}`));
         }
     }
-};
+};*/
 function takeCommand(message:Discord.Message) {
+    const mentionsUs = message.isMentioned(client.user);
+    if (message.channel instanceof Discord.TextChannel && !mentionsUs) {
+        return Promise.resolve();
+    }
+    let commandText = message.content.trim();
+    if (mentionsUs) {
+        const mention = `<@${client.user.id}>`;
+        commandText = message.content.split(mention)[1].trim();
+    }
+    return dumbResponse(commandText, message);
+    /*
     // A public message that doesn't involve us;
     const mentionsUs = message.isMentioned(client.user);
     if (message.channel instanceof Discord.TextChannel && !mentionsUs) {
@@ -290,7 +217,7 @@ function takeCommand(message:Discord.Message) {
 
     // Command not found, try invite
     return commands['join'](commandText, message, {throwIfUnable: true})
-    .catch(() => dumbResponse(commandText, message));
+    .catch(() => dumbResponse(commandText, message));*/
 }
 function dumbResponse(text:string, message:Discord.Message) {
     const name = message.author.name;
@@ -345,7 +272,7 @@ function objectifyMember(server:Discord.Server, user:Discord.User) {
 
     const prefix = `member-${user.id}:`;
     return {
-        [`${prefix}nick`    ]: details.nick,
+        [`${prefix}nick`    ]: details.nick || user.name,
         [`${prefix}icon`    ]: user.avatarURL,
         [`${prefix}status`  ]: user.status,
         [`${prefix}game`    ]: game,
@@ -403,6 +330,16 @@ client.on('serverCreated', server => {
     if (timelines.has(server)) {
         loggy.error(`Oh no, ${server.name} is already timelined`);
     } else timelines.set(server, createServerTimeline(server));
+
+    root.child(`timelines/as_of/${server.id}`).once('value')
+    .then(serverSnap => messager.type(server, !serverSnap.exists() ? [
+        `Hi I'm ${client.user.name}, and someone sent me here`,
+        `I make live dot plots of your server's activity stats so you can always see which channels are POPPIN.`,
+        `Here's the graph for ${server.name}: ${getLiveUrl(server.id)}`
+    ] : [
+        `Hi I'm ${client.user.name} and someone has brought me back`,
+        `Once again, my live dot plot of ${server.name} is at ${getLiveUrl(server.id)}`
+    ]));
 });
 client.on('serverDeleted', server => {
     loggy.log(`${Emoji.LEAVE} Just left ${server.name}`);
@@ -479,36 +416,42 @@ client.on('ready', () => {
     client.userAgent.version = module.exports.version;
     client.setPlayingGame(config.get('settings.discordStatus') + '');
 
-    return client.joinServer(config.get('settings.logServer') + '')
-    .then(server => {
-        loggy.setLogServer(server);
-
-        const timeString = (new Date()).toLocaleString();
-        loggy.log(`${Emoji.STAR} Logged on ${timeString} ${Emoji.STAR}`);
-        //console.dir(client);
-
-        const servers = client.servers;
-        const timelinesReady = Promise.all([...servers.map(server => {
-            const timeline = createServerTimeline(server);
-            timelines.set(server, timeline);
-            return timeline.gotReady;
-        })]).then(() => { // Just log things
-            return loggy.log(`${Emoji.UPLOAD_SERVER} Uploaded info and ` +
-                `channels ${Emoji.MORE}`, channelsInfo(servers));
-        }).catch(error => loggy.error(
-            `Error uploading servers ${Emoji.MORE}`, error));
-
-        const messagesCaughtUp = Promise.all([...servers.map(({channels}) => {
-            const textChannels = channels.filter(c => c.type === 'text');
-            return textChannels.map(c => messageSaver.catchUp(c));
-        })]);
-
-        // Text channels catching up
-        Promise.all([timelinesReady, messagesCaughtUp]).then(() => {
-            loggy.log(`${Emoji.WHEW} Whew, it's all over`);
-        });
-    })
+    const logServer = client.servers.find(
+        ({id}) => id === config.get('settings.logServer'));
+    if (logServer) {
+        init(logServer);
+    } else {
+        console.error('Not admitted to log server')
+    }
 });
+function init(logServer:Discord.Server) {
+    loggy.setLogServer(logServer);
+
+    const timeString = (new Date()).toLocaleString();
+    loggy.log(`${Emoji.STAR} Logged on ${timeString} ${Emoji.STAR}`);
+    //console.dir(client);
+
+    const servers = client.servers;
+    const timelinesReady = Promise.all([...servers.map(server => {
+        const timeline = createServerTimeline(server);
+        timelines.set(server, timeline);
+        return timeline.gotReady;
+    })]).then(() => { // Just log things
+        return loggy.log(`${Emoji.UPLOAD_SERVER} Uploaded info and ` +
+            `channels ${Emoji.MORE}`, channelsInfo(servers));
+    }).catch(error => loggy.error(
+        `Error uploading servers ${Emoji.MORE}`, error));
+
+    const messagesCaughtUp = Promise.all([...servers.map(({channels}) => {
+        const textChannels = channels.filter(c => c.type === 'text');
+        return textChannels.map(c => messageSaver.catchUp(c));
+    })]);
+
+    // Text channels catching up
+    Promise.all([timelinesReady, messagesCaughtUp]).then(() => {
+        loggy.log(`${Emoji.WHEW} Whew, it's all over`);
+    });
+}
 
 
 process.on('uncaughtException', (error) => {
