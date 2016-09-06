@@ -10,6 +10,9 @@ interface PendingMessage {
 type Channelesque = Discord.ChannelResolvable;
 
 export default class Messager {
+    static escape(text:string) {
+        return text.replace(/(`|\*|\\|~~|__)/g, '\\$1');
+    }
 
     private _client:Discord.Client;
 

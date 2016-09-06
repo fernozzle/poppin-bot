@@ -65,6 +65,13 @@ export default class MessageSaver {
         const base = messageID(NS.BASE, message);
         updateObject[base + '/edit'] =
             message.editedTimestamp || null;
+        updateObject[base + '/pin'] = message.pinned || null;
+        updateObject[base + '/tts'] = message.tts    || null;
+
+        if (message.embeds) {
+            console.dir(message.embeds);
+        }
+
         // SWEAR
         updateObject[messageID(NS.SWEAR, message)] =
             swearFilter.isProfane(message.content) || null;

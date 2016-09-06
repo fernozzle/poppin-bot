@@ -5,11 +5,7 @@ import {mapObject} from './Util'
  * Returns `optional` but `fallback` when it's undefined/null
  */
 function fallback(optional, fallback) {
-    return (
-        optional !== undefined &&
-        optional !== null &&
-        optional !== ''
-    ) ? optional : fallback;
+    return optional || fallback;
 }
 /**
  * Note that the returned list of keys is a subset
@@ -108,7 +104,7 @@ export default class StateTimeline {
     update(newProps:{}, time = Date.now()) {
         return this.gotReady.then(() => {
             const changedKeys = deltaKeys(newProps, this.state);
-            console.log(changedKeys.map(key => key + ':\n\t' + this.state[key] + ' => ' + newProps[key]).join('\n'));
+            console.log(changedKeys.map(key => key + ':\n  ' + this.state[key] + ' => ' + newProps[key]).join('\n'));
             const updateObject = this.buildEvent(
                 newProps, this.state,
                 changedKeys, time, NONE);

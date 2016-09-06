@@ -63,24 +63,25 @@ function findServerId(query:string):Promise<{id:string, name:string}> {
         });
     })
 }
-function selectServer(query:string, message:Discord.Message, {permission, missing, unprivileged}):Promise<Discord.Server> {
+function selectServer(query:string, message:Discord.Message,
+    {permission, missing, unprivileged}):Promise<Discord.Server> {
+
     return new Promise((resolve, reject) => {
         // PM, no server specified
         if (!message.server && !query) {
             throw messager.type(message, missing);
         }
-
         // Find specified server, with message's server as default
-        const foundServer:Discord.Server = client.servers.find(server => {
-            const serve = server as Discord.Server;
-            return serve.id === query || serve.name.toLowerCase() === query.toLowerCase();
-        }) || message.server;
-
+        const foundServer = client.servers.find(s =>
+            s.id === query ||
+            s.name.toLowerCase() === query.toLowerCase()
+        ) || message.server;
         // Server not found
         if (!foundServer) {
-            throw messager.type(message, `I'm not watching any servers with the name or ID "${query}"`);
+            throw messager.type(message,
+                `I'm not watching any servers ` +
+                `with the name or ID "${query}"`);
         }
-
         // Insufficient permissions
         if (!userCan(message.author, foundServer, permission)) {
             throw messager.type(message, unprivileged(foundServer));
@@ -88,8 +89,9 @@ function selectServer(query:string, message:Discord.Message, {permission, missin
         resolve(foundServer);
     });
 }
-/*
+
 const commands = {
+    /*
     'list': function(tail:string, message:Discord.Message) {
         if (!userCan(message.author)) {
             return messager.type(message, `${Emoji.ERROR} You don't have permission to do list em off`);
@@ -112,7 +114,7 @@ const commands = {
                 offlineIdNames.map(({id, name}) => `${Emoji.LEAVE} ${name} (${id})`).join('\n')
             ]);
         });
-    },
+    },*/
     'users': function(tail:string, message:Discord.Message) {
         const options = {
             permission: "readMessages", // everyone on the server
@@ -131,7 +133,16 @@ const commands = {
             server.members.map(m => Emoji.randomHuman() + ' ' + m).join('\n')
         ]));
     },
-    'channels': function(tail:string, message:Discord.Message) {
+    'user': function(tail:string, message:Discord.Message) {
+        const user = message.author;
+        const details = message.server.detailsOfUser(user);
+        return messager.type(message, [
+            `${Emoji.randomHuman()} ${user}\n` +
+            `Username: \`${user.name}\`\n` +
+            `Nickname: \`${details.nick || '*none*'}\``
+        ]);
+    },
+    /*'channels': function(tail:string, message:Discord.Message) {
         const options = {
             permission: "readMessages", // everyone on the server
             missing: [
@@ -185,8 +196,8 @@ const commands = {
             return root.update(updateObj)
             .then(() => messager.type(message, `${Emoji.OBLITERATE} Cleared messages on ${name}`));
         }
-    }
-};*/
+    }*/
+};
 function takeCommand(message:Discord.Message) {
     const mentionsUs = message.isMentioned(client.user);
     if (message.channel instanceof Discord.TextChannel && !mentionsUs) {
@@ -197,27 +208,12 @@ function takeCommand(message:Discord.Message) {
         const mention = `<@${client.user.id}>`;
         commandText = message.content.split(mention)[1].trim();
     }
-    return dumbResponse(commandText, message);
-    /*
-    // A public message that doesn't involve us;
-    const mentionsUs = message.isMentioned(client.user);
-    if (message.channel instanceof Discord.TextChannel && !mentionsUs) {
-        return Promise.resolve();
-    }
-
-    let commandText = message.content.trim();
-    if (mentionsUs) {
-        const mention = `<@${client.user.id}>`;
-        commandText = message.content.split(mention)[1].trim();
-    }
 
     const [head, ...tail] = commandText.split(' ');
     const command = commands[head];
     if (command) return command.call(commands, tail.join(' '), message);
 
-    // Command not found, try invite
-    return commands['join'](commandText, message, {throwIfUnable: true})
-    .catch(() => dumbResponse(commandText, message));*/
+    return dumbResponse(commandText, message);
 }
 function dumbResponse(text:string, message:Discord.Message) {
     const name = message.author.name;
@@ -267,18 +263,22 @@ function objectifyChannel(channel:Discord.ServerChannel) {
 }
 function objectifyMember(server:Discord.Server, user:Discord.User) {
     const details = server.detailsOf(user);
-    const voiceId = (user.voiceChannel || {id: undefined}).id;
-    const game    = (user.game || {name: undefined}).name;
+    const voiceId = (user.voiceChannel || {id: null}).id;
+    const game    = (user.game || {name: null}).name;
 
     const prefix = `member-${user.id}:`;
     return {
-        [`${prefix}nick`    ]: details.nick || user.name,
+        [`${prefix}name`    ]: user.name,
+        [`${prefix}nick`    ]: details.nick,
         [`${prefix}icon`    ]: user.avatarURL,
         [`${prefix}status`  ]: user.status,
         [`${prefix}game`    ]: game,
+        [`${prefix}bot`     ]: user.bot,
+
         [`${prefix}vox-chan`]: voiceId,
         [`${prefix}vox-mute`]: details.mute || details.selfMute,
         [`${prefix}vox-deaf`]: details.deaf || details.selfDeaf,
+        [`${prefix}vox-spkg`]: user.speaking,
     }
 }
 function deletify(object:{}) {
@@ -307,7 +307,8 @@ client.on('message', message => {
     if (message.channel instanceof Discord.TextChannel) {
         messageSaver.messagesPosted(message);
     } else if (message.channel instanceof Discord.PMChannel) {
-        loggy.log(`${Emoji.MESSAGE} Message from ${author} ${Emoji.MORE}`, message.cleanContent);
+        loggy.log(`${Emoji.MESSAGE} Message from ` +
+            `${author} ${Emoji.MORE}`, message.cleanContent);
     }
     // Receive our pending messages
     if (author === client.user) {
@@ -316,7 +317,9 @@ client.on('message', message => {
     }
     // Respond to commands
     takeCommand(message).catch(error => {
-        loggy.error(`Couldn't take ${author.name}'s command "${message.cleanContent}" ${Emoji.MORE}`, error)
+        loggy.error(`Couldn't take ${author.name}'s ` +
+            `command "${message.cleanContent}" ` +
+            `${Emoji.MORE}`, error)
     });
 });
 client.on('messageUpdated', (oldMessage, newMessage) => {
@@ -334,7 +337,7 @@ client.on('serverCreated', server => {
     root.child(`timelines/as_of/${server.id}`).once('value')
     .then(serverSnap => messager.type(server, !serverSnap.exists() ? [
         `Hi I'm ${client.user.name}, and someone sent me here`,
-        `I make live dot plots of your server's activity stats so you can always see which channels are POPPIN.`,
+        `I make live dot plots of your server's activity stats so you can always see which channels are **poppin**.`,
         `Here's the graph for ${server.name}: ${getLiveUrl(server.id)}`
     ] : [
         `Hi I'm ${client.user.name} and someone has brought me back`,
@@ -365,18 +368,15 @@ client.on('serverUpdated', (oldServer, newServer) => {
         objectifyServer(newServer));
 });
 client.on('channelCreated', (channel:Discord.ServerChannel) => {
-    if (!channel.server) return;
-    timelines.get(channel.server).update(
+    if (channel.server) timelines.get(channel.server).update(
         objectifyChannel(channel));
 });
-client.on('channelUpdated', (channelOld, channel:Discord.ServerChannel) => {
-    if (!channel.server) return;
-    timelines.get(channel.server).update(
+client.on('channelUpdated', (old, channel:Discord.ServerChannel) => {
+    if (channel.server) timelines.get(channel.server).update(
         objectifyChannel(channel));
 });
 client.on('channelDeleted', (channel:Discord.ServerChannel) => {
-    if (!channel.server) return;
-    timelines.get(channel.server).update(
+    if (channel.server) timelines.get(channel.server).update(
         deletify(objectifyChannel(channel)));
 });
 
@@ -384,14 +384,37 @@ client.on('serverNewMember', (server, user) => {
     timelines.get(server).update(
         objectifyMember(server, user));
 });
+client.on('serverMemberUpdated', (server, user, userOld) => {
+    timelines.get(server).update(
+        objectifyMember(server, user));
+});
 client.on('serverMemberRemoved', (server, user) => {
     timelines.get(server).update(
         deletify(objectifyMember(server, user)));
 });
+client.on('voiceJoin', ({server}, user) => {
+    timelines.get(server).update(
+        objectifyMember(server, user));
+});
+client.on('voiceSwitch', (old, {server}, user) => {
+    timelines.get(server).update(
+        objectifyMember(server, user));
+});
+client.on('voiceLeave', ({server}, user) => {
+    timelines.get(server).update(
+        objectifyMember(server, user));
+});
+client.on('voiceStateUpdate', ({server}, user) => {
+    timelines.get(server).update(
+        objectifyMember(server, user));
+});
+client.on('voiceSpeaking', ({server}, user) => {
+    timelines.get(server).update(
+        objectifyMember(server, user));
+});
 client.on('presence', (oldUser, newUser) => {
     const serverHasUser = s => s.members.has('id', newUser.id);
     const servers = client.servers.filter(serverHasUser);
-
     for (const server of servers) {
         timelines.get(server).update(
             objectifyMember(server, newUser));

@@ -3,7 +3,7 @@
 declare module 'discord.js' {
     import * as events from 'events';
     import { Readable as ReadableStream } from 'stream';
-    
+
     export class Client extends events.EventEmitter {
         // Properties
         users: Cache<User>;
@@ -20,10 +20,10 @@ declare module 'discord.js' {
         user: User;
         userAgent: { url: string, version: string, full: string };
         voiceConnection: VoiceConnection;
-        
+
         // Constructor
         constructor(parameters?: Client_Parameters);
-        
+
         // Class functions
         login(email: string, password: string, callback?: (error: Error, token: string) => void): Promise<string>;
         loginWithToken(token: string, email?: string, password?: string, callback?: (error: Error, token: string) => void): Promise<string>;
@@ -93,7 +93,7 @@ declare module 'discord.js' {
         deafenMember(user: UserResolvable, server: ServerResolvable, callback?: (error: Error) => void): Promise<void>;
         undeafenMember(user: UserResolvable, server: ServerResolvable, callback?: (error: Error) => void): Promise<void>;
         setNickname(server: ServerResolvable, nickname: string, user?: UserResolvable, callback?: (error: Error) => void): Promise<void>;
-        
+
         // Events
         on(event: 'ready', listener: Function): this;
         on(event: 'disconnected', listener: Function): this;
@@ -121,12 +121,13 @@ declare module 'discord.js' {
         on(event: 'userBanned', listener: (user: User, server: Server) => void): this;
         on(event: 'userUnbanned', listener: (user: User, server: Server) => void): this;
         on(event: 'voiceJoin', listener: (voiceChannel: VoiceChannel, user: User) => void): this;
-        on(event: 'voiceSwitch', listener: (voiceChannel: VoiceChannel, user: User) => void): this;
-        on(event: 'voiceLeave', listener: (oldVoiceChannel: VoiceChannel, newVoiceChannel: VoiceChannel, user: User) => void): this;
+        // MICHAEL WAS HERE
+        on(event: 'voiceSwitch', listener: (oldVoiceChannel: VoiceChannel, voiceChannel: VoiceChannel, user: User) => void): this;
+        on(event: 'voiceLeave', listener: (newVoiceChannel: VoiceChannel, user: User) => void): this;
         on(event: 'voiceStateUpdate', listener: (voiceChannel: VoiceChannel, user: User, oldVoiceProperties: User_VoiceProperties, newVoiceProperties: User_VoiceProperties) => void): this;
         on(event: string, listener: Function): this;
     }
-    
+
     export interface Client_Parameters {
         autoReconnect?: boolean;
         compress?: boolean;
@@ -139,7 +140,7 @@ declare module 'discord.js' {
         shardCount?: number;
         shardId?: number;
     }
-    
+
     export interface Server_OptionsStructure {
         name?: string,
         region?: AvailableRegions,
@@ -148,9 +149,9 @@ declare module 'discord.js' {
         splash?: Base64Resolvable,
         verificationLevel?: number,
         afkChannelID?: ChannelResolvable,
-        afkTimeout?: number 
+        afkTimeout?: number
     }
-    
+
     export interface Role_OptionsStructure {
         color?: number,
         hoist?: boolean,
@@ -158,7 +159,7 @@ declare module 'discord.js' {
         permissions?: string[],
         mentionable?: boolean
     }
-    
+
     export interface Server_UserDetails {
         joinedAt: number,
         roles: Role[],
@@ -168,19 +169,19 @@ declare module 'discord.js' {
         selfDeaf: boolean,
         nick: string
     }
-    
+
     export interface User_VoiceProperties {
         mute: boolean,
         selfMute: boolean,
         deaf: boolean,
         selfDeaf: boolean
     }
-    
+
     export interface Voice_PlayOptions {
         seek?: number,
         volume?: number | string
     }
-    
+
     export interface Message_Attachment {
         id: string;
         url: string;
@@ -190,7 +191,7 @@ declare module 'discord.js' {
         height?: number;
         width?: number;
     }
-    
+
     export interface Message_Embed {
         url: string;
         type: string;
@@ -202,11 +203,11 @@ declare module 'discord.js' {
             width: number;
         }
     }
-    
+
     class Equality {
         equals(object): boolean;
     }
-    
+
     export class Cache<T> extends Array {
         get(key, value): T;
         getAll(key, value): Cache<T>;
@@ -230,10 +231,13 @@ declare module 'discord.js' {
         bot: boolean;
         voiceChannel: VoiceChannel;
         createdAt: Date;
-        
+
+        // MICHAEL WAS HERE
+        speaking: boolean;
+
         mention(): string;
         sendMessage(content?: StringResolvable, options?: { tts?: boolean, file?: { file: FileResolvable, name?: string, disableEveryone?: boolean } }, callback?: (error: Error, message: Message) => void): Promise<Message>;
-        sendTTSMessage(content: StringResolvable, callback?: (error: Error, message: Message) => void): Promise<Message>;    
+        sendTTSMessage(content: StringResolvable, callback?: (error: Error, message: Message) => void): Promise<Message>;
         sendFile(attachment: FileResolvable, name?: string, content?: string, callback?: (error: Error, message: Message) => void): Promise<Message>;
         startTyping(callback?: (error: Error) => void): Promise<void>;
         stopTyping(callback?: (error: Error) => void): Promise<void>;
@@ -246,7 +250,7 @@ declare module 'discord.js' {
         client: Client;
         isPrivate: boolean;
         createdAt: Date;
-        
+
         delete(): void;
     }
     export class ServerChannel extends Channel {
@@ -255,7 +259,7 @@ declare module 'discord.js' {
         position: number;
         permissionOverwrites: Cache<PermissionOverwrite>;
         server: Server;
-        
+
         permissionsOf(userOrRole: User | Role): ChannelPermissions;
         mention(): string;
         setName(name: string, callback?: (error: Error) => void): Promise<void>;
@@ -292,7 +296,7 @@ declare module 'discord.js' {
         members: Cache<User>;
         userLimit: number;
         bitrate: number;
-        
+
         setUserLimit(limit: number, callback?: (error: Error) => void): Promise<void>;
         join(callback?: (error: Error, connection: VoiceConnection) => void): Promise<VoiceConnection>;
         setUserLimit(imit: number, callback?: (error: Error) => void): Promise<void>;
@@ -316,7 +320,7 @@ declare module 'discord.js' {
         general: ServerChannel;
         owner: User;
         createdAt: Date;
-        
+
         rolesOfUser(user: User): Role[];
         rolesOf(user: User): Role[];
         rolesOfMember(user: User): Role[];
@@ -325,7 +329,7 @@ declare module 'discord.js' {
         detailsOfUser(user: User): Server_UserDetails;
         detailsOf(user: User): Server_UserDetails;
         detailsOfMember(user: User): Server_UserDetails;
-        
+
         // shortcuts
         leave(callback?: (error: Error) => void): Promise<void>;
         delete(server: Server, callback?: (error: Error) => void): Promise<void>;
@@ -354,7 +358,10 @@ declare module 'discord.js' {
         content: string;
         cleanContent: string;
         mentions: User[];
-        
+
+        // MICHAEL WAS HERE
+        pinned: boolean;
+
         isMentioned(user: User): boolean;
         delete(options?: { wait: number }, callback?: (error: Error) => void): Promise<void>;
         update(content: StringResolvable, options?: { tts: boolean }, callback?: (error: Error, message: Message) => void): Promise<Message>;
@@ -388,7 +395,7 @@ declare module 'discord.js' {
         server: Server;
         client: Client;
         createAt: Date;
-        
+
         serialise(): { [key: string]: boolean };
         serialize(): { [key: string]: boolean };
         hasPermission(permission: string): boolean;
@@ -427,11 +434,11 @@ declare module 'discord.js' {
         playing: boolean;
         streamTime: number;
         paused: boolean;
-        
+
         playFile(path: string, options?: Voice_PlayOptions, callback?: (error: Error, intent: StreamIntent) => void): Promise<StreamIntent>;
         playRawStream(stream: ReadableStream, options?: Voice_PlayOptions, callback?: (error: Error, intent: StreamIntent) => void): Promise<StreamIntent>;
         playArbitraryFFmpeg(ffmpegOptions: string[], volume?: number | string, callback?: (error: Error, intent: StreamIntent) => void): Promise<StreamIntent>;
-        
+
         setSpeaking(value: boolean): void;
         setVolume(volume: number): void;
         getVolume(): number;
@@ -441,7 +448,7 @@ declare module 'discord.js' {
         resume(): void;
         stopPlaying(): void;
         destroy(): void;
-        
+
         on(event: 'ready', listener: Function): this;
         on(event: 'close', listener: Function): this;
         on(event: 'error', listener: (error: Error, message: string) => void): this;
@@ -457,7 +464,7 @@ declare module 'discord.js' {
         on(event: 'pause', listener: Function): this;
         on(event: string, listener: Function): this;
     }
-    
+
     type ChannelResolvable = Channel | Server | Message | User | string;
     type VoiceChannelResolvable = VoiceChannel | string;
     type ServerResolvable = Server | ServerChannel | Message | string;
