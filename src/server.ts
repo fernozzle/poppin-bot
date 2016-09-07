@@ -263,8 +263,12 @@ function objectifyChannel(channel:Discord.ServerChannel) {
 }
 function objectifyMember(server:Discord.Server, user:Discord.User) {
     const details = server.detailsOf(user);
-    const voiceId = (user.voiceChannel || {id: null}).id;
-    const game    = (user.game || {name: null}).name;
+
+    const voiceId = (
+        user.voiceChannel &&
+        server.channels.get(user.voiceChannel.id)
+    ) ? user.voiceChannel.id : null;
+    const game = user.game ? user.game.name : null;
 
     const prefix = `member-${user.id}:`;
     return {
@@ -277,160 +281,170 @@ function objectifyMember(server:Discord.Server, user:Discord.User) {
 
         [`${prefix}vox-chan`]: voiceId,
         [`${prefix}vox-mute`]: details.mute || details.selfMute,
-        [`${prefix}vox-deaf`]: details.deaf || details.selfDeaf,
-        [`${prefix}vox-spkg`]: user.speaking,
+        [`${prefix}vox-deaf`]: details.deaf || details.selfDeaf
     }
 }
 function deletify(object:{}) {
-    for (const key of Object.keys(object)) {
-        object[key] = undefined;
-    }
+    Object.keys(object).forEach(k => object[k] = null);
     return object;
 }
 
 function createServerTimeline(server:Discord.Server) {
     const tlRoot = root.child(`timelines`);
     const channels = server.channels.map(objectifyChannel);
-    const members = server.members.map(member => {
-        return objectifyMember(server, member);
-    });
+    const members = server.members.map(
+        member => objectifyMember(server, member));
     const props = Object.assign(objectifyServer(server),
         ...channels, ...members);
 
     return new StateTimeline(tlRoot, server.id, props);
 }
 
-client.on('message', message => {
-    const author = message.author;
+function registerEvents() {
+    client.on('message', message => {
+        const author = message.author;
 
-    // Log public messages
-    if (message.channel instanceof Discord.TextChannel) {
-        messageSaver.messagesPosted(message);
-    } else if (message.channel instanceof Discord.PMChannel) {
-        loggy.log(`${Emoji.MESSAGE} Message from ` +
-            `${author} ${Emoji.MORE}`, message.cleanContent);
-    }
-    // Receive our pending messages
-    if (author === client.user) {
-        messager.receiveOwnMessage(message);
-        return;
-    }
-    // Respond to commands
-    takeCommand(message).catch(error => {
-        loggy.error(`Couldn't take ${author.name}'s ` +
-            `command "${message.cleanContent}" ` +
-            `${Emoji.MORE}`, error)
+        // Log public messages
+        if (message.channel instanceof Discord.TextChannel) {
+            messageSaver.messagesPosted(message);
+        } else if (message.channel instanceof Discord.PMChannel) {
+            loggy.log(`${Emoji.MESSAGE} Message from ` +
+                `${author} ${Emoji.MORE}`, message.cleanContent);
+        }
+        // Receive our pending messages
+        if (author === client.user) {
+            messager.receiveOwnMessage(message);
+            return;
+        }
+        // Respond to commands
+        takeCommand(message).catch(error => {
+            loggy.error(`Couldn't take ${author.name}'s ` +
+                `command "${message.cleanContent}" ` +
+                `${Emoji.MORE}`, error)
+        });
     });
-});
-client.on('messageUpdated', (oldMessage, newMessage) => {
-    messageSaver.messageUpdated(oldMessage, newMessage);
-});
-client.on('messageDeleted', message => {
-    messageSaver.messageDeleted(message);
-});
+    client.on('messageUpdated', (oldMessage, newMessage) => {
+        messageSaver.messageUpdated(oldMessage, newMessage);
+    });
+    client.on('messageDeleted', message => {
+        messageSaver.messageDeleted(message);
+    });
 
-client.on('serverCreated', server => {
-    if (timelines.has(server)) {
-        loggy.error(`Oh no, ${server.name} is already timelined`);
-    } else timelines.set(server, createServerTimeline(server));
+    client.on('serverCreated', server => {
+        if (timelines.has(server)) {
+            loggy.error(`Oh no, ${server.name} is already timelined`);
+        } else timelines.set(server, createServerTimeline(server));
 
-    root.child(`timelines/as_of/${server.id}`).once('value')
-    .then(serverSnap => messager.type(server, !serverSnap.exists() ? [
-        `Hi I'm ${client.user.name}, and someone sent me here`,
-        `I make live dot plots of your server's activity stats so you can always see which channels are **poppin**.`,
-        `Here's the graph for ${server.name}: ${getLiveUrl(server.id)}`
-    ] : [
-        `Hi I'm ${client.user.name} and someone has brought me back`,
-        `Once again, my live dot plot of ${server.name} is at ${getLiveUrl(server.id)}`
-    ]));
-});
-client.on('serverDeleted', server => {
-    loggy.log(`${Emoji.LEAVE} Just left ${server.name}`);
-    timelines.get(server).destroy();
-    timelines.delete(server);
-});
+        root.child(`timelines/as_of/${server.id}`).once('value')
+        .then(serverSnap => messager.type(server, !serverSnap.exists() ? [
+            `Hi I'm ${client.user.name}, and someone sent me here`,
+            `I make live dot plots of your server's activity stats so you can always see which channels are **poppin**.`,
+            `Here's the graph for ${server.name}: ${getLiveUrl(server.id)}`
+        ] : [
+            `Hi I'm ${client.user.name} and someone has brought me back`,
+            `Once again, my live dot plot of ${server.name} is at ${getLiveUrl(server.id)}`
+        ]));
+    });
+    client.on('serverDeleted', server => {
+        loggy.log(`${Emoji.LEAVE} Just left ${server.name}`);
+        timelines.get(server).destroy();
+        timelines.delete(server);
+    });
 
-/*client.on('userBanned', (user, server) => {
-    if (user !== client.user) return;
-    loggy.error(`Daaang I just got banned from ${server.name}!`);
-});
-client.on('userTypingStarted', (user, channel:Discord.TextChannel) => {
-    if (!channel.server) return; // A PM channel
-    //loggy.log(`Ho boy ${channel.name} get ready for a brand spanking steamy new post from ${user.name}`);
-});
-client.on('userTypingStopped', (user, channel:Discord.TextChannel) => {
-    if (!channel.server) return; // A PM channel
-    //loggy.log(`Aww ${channel.name} just saw ${user.name} stop typing`);
-});*/
+    /*client.on('userBanned', (user, server) => {
+        if (user !== client.user) return;
+        loggy.error(`Daaang I just got banned from ${server.name}!`);
+    });
+    client.on('userTypingStarted', (user, channel:Discord.TextChannel) => {
+        if (!channel.server) return; // A PM channel
+        //loggy.log(`Ho boy ${channel.name} get ready for a brand spanking steamy new post from ${user.name}`);
+    });
+    client.on('userTypingStopped', (user, channel:Discord.TextChannel) => {
+        if (!channel.server) return; // A PM channel
+        //loggy.log(`Aww ${channel.name} just saw ${user.name} stop typing`);
+    });*/
 
-client.on('serverUpdated', (oldServer, newServer) => {
-    timelines.get(newServer).update(
-        objectifyServer(newServer));
-});
-client.on('channelCreated', (channel:Discord.ServerChannel) => {
-    if (channel.server) timelines.get(channel.server).update(
-        objectifyChannel(channel));
-});
-client.on('channelUpdated', (old, channel:Discord.ServerChannel) => {
-    if (channel.server) timelines.get(channel.server).update(
-        objectifyChannel(channel));
-});
-client.on('channelDeleted', (channel:Discord.ServerChannel) => {
-    if (channel.server) timelines.get(channel.server).update(
-        deletify(objectifyChannel(channel)));
-});
+    client.on('serverUpdated', (oldServer, newServer) => {
+        timelines.get(newServer).update(
+            objectifyServer(newServer));
+    });
+    client.on('channelCreated', (channel:Discord.ServerChannel) => {
+        if (channel.server) timelines.get(channel.server).update(
+            objectifyChannel(channel));
+    });
+    client.on('channelUpdated', (old, channel:Discord.ServerChannel) => {
+        if (channel.server) timelines.get(channel.server).update(
+            objectifyChannel(channel));
+    });
+    client.on('channelDeleted', (channel:Discord.ServerChannel) => {
+        if (!channel.server) return;
+        const update = deletify(objectifyChannel(channel));
 
-client.on('serverNewMember', (server, user) => {
-    timelines.get(server).update(
-        objectifyMember(server, user));
-});
-client.on('serverMemberUpdated', (server, user, userOld) => {
-    timelines.get(server).update(
-        objectifyMember(server, user));
-});
-client.on('serverMemberRemoved', (server, user) => {
-    timelines.get(server).update(
-        deletify(objectifyMember(server, user)));
-});
-client.on('voiceJoin', ({server}, user) => {
-    timelines.get(server).update(
-        objectifyMember(server, user));
-});
-client.on('voiceSwitch', (old, {server}, user) => {
-    timelines.get(server).update(
-        objectifyMember(server, user));
-});
-client.on('voiceLeave', ({server}, user) => {
-    timelines.get(server).update(
-        objectifyMember(server, user));
-});
-client.on('voiceStateUpdate', ({server}, user) => {
-    timelines.get(server).update(
-        objectifyMember(server, user));
-});
-client.on('voiceSpeaking', ({server}, user) => {
-    timelines.get(server).update(
-        objectifyMember(server, user));
-});
-client.on('presence', (oldUser, newUser) => {
-    const serverHasUser = s => s.members.has('id', newUser.id);
-    const servers = client.servers.filter(serverHasUser);
-    for (const server of servers) {
+        if (channel.type === 'voice') { // Bad news for these guys
+            const voice = channel as Discord.VoiceChannel;
+            Object.assign(update, ...voice.members.map(
+                member => objectifyMember(channel.server, member)));
+        }
+        timelines.get(channel.server).update(update);
+    });
+
+    client.on('serverNewMember', (server, user) => {
         timelines.get(server).update(
-            objectifyMember(server, newUser));
-    }
-});
+            objectifyMember(server, user));
+    });
+    client.on('serverMemberUpdated', (server, user, userOld) => {
+        timelines.get(server).update(
+            objectifyMember(server, user));
+    });
+    client.on('serverMemberRemoved', (server, user) => {
+        timelines.get(server).update(
+            deletify(objectifyMember(server, user)));
+    });
 
-function channelsInfo(servers) {
-    const channelLine = (channel, i, tcs) =>
-        ((i === tcs.length - 1) ? '\u2517' : '\u2523') +
-        ` ${Emoji.CHANNEL} ${channel.name}`;
-    const channelList = server =>
-        server.channels.filter(c => c.type === 'text')
-            .map(channelLine).join('\n');
-    return servers.map(server =>
-        `${Emoji.SERVER} ${server.name}\n${channelList(server)}`
-    ).join('\n');
+    /**
+     * Finds the most populous voice channel and joins it
+     */
+    function reevaluateVoiceChannel(server:Discord.Server):Promise<any> {
+        if (server.channels.length === 0) return Promise.resolve();
+
+        let [biggest, bigCount]:[Discord.VoiceChannel, number] = [null, -1];
+        for (const test of server.channels.getAll('type', 'voice')) {
+            const testCount = test.members.length -
+                (test.members.get(client.user.id) ? 1 : 0);
+            if (testCount < bigCount || testCount < 1) continue;
+            [biggest, bigCount] = [test, testCount];
+        }
+        // Join biggest, maybe leaving another
+        if (biggest) return biggest.join();
+
+        // Just leave
+        const conn = client.voiceConnections.get('server', server);
+        if (conn) return client.leaveVoiceChannel(conn.voiceChannel);
+        return Promise.resolve();
+    }
+    client.on('voiceJoin', ({server}, user) => {
+        timelines.get(server).update(objectifyMember(server, user));
+    });
+    client.on('voiceSwitch', (old, {server}, user) => {
+        timelines.get(server).update(objectifyMember(server, user));
+    });
+    client.on('voiceLeave', ({server}, user) => {
+        timelines.get(server).update(objectifyMember(server, user));
+    });
+    client.on('voiceStateUpdate', ({server}, user) => {
+        timelines.get(server).update(objectifyMember(server, user));
+    });
+    client.on('presence', (oldUser, user) => {
+        const serverHasUser = s => s.members.get(user.id);
+        const servers = client.servers.filter(serverHasUser);
+        for (const server of servers) {
+            timelines.get(server).update(
+                objectifyMember(server, user));
+        }
+    });
+    client.on('disconnected', () => {
+        login();
+    });
 }
 
 client.on('ready', () => {
@@ -439,14 +453,24 @@ client.on('ready', () => {
     client.userAgent.version = module.exports.version;
     client.setPlayingGame(config.get('settings.discordStatus') + '');
 
-    const logServer = client.servers.find(
-        ({id}) => id === config.get('settings.logServer'));
-    if (logServer) {
-        init(logServer);
-    } else {
-        console.error('Not admitted to log server')
-    }
+    console.dir(client.servers.map(s => s.name));
+    const logServer = client.servers.get(config.get('settings.logServer'));
+    if (logServer) init(logServer);
+    else console.error('Not admitted to log server');
 });
+
+
+function channelsInfo(servers) {
+    const channelLine = (channel, i, tcs) =>
+        ((i === tcs.length - 1) ? '\u2517' : '\u2523') +
+        ` ${Emoji.CHANNEL} ${channel.name}`;
+    const channelList = server =>
+        server.channels.getAll('type', 'text')
+            .map(channelLine).join('\n');
+    return servers.map(server =>
+        `${Emoji.SERVER} ${server.name}\n${channelList(server)}`
+    ).join('\n');
+}
 function init(logServer:Discord.Server) {
     loggy.setLogServer(logServer);
 
@@ -459,21 +483,23 @@ function init(logServer:Discord.Server) {
         const timeline = createServerTimeline(server);
         timelines.set(server, timeline);
         return timeline.gotReady;
-    })]).then(() => { // Just log things
-        return loggy.log(`${Emoji.UPLOAD_SERVER} Uploaded info and ` +
-            `channels ${Emoji.MORE}`, channelsInfo(servers));
-    }).catch(error => loggy.error(
+    })]).then(() => // Just log things
+        loggy.log(`${Emoji.UPLOAD_SERVER} Uploaded info and ` +
+            `channels ${Emoji.MORE}`, channelsInfo(servers)
+    )).catch(error => loggy.error(
         `Error uploading servers ${Emoji.MORE}`, error));
 
-    const messagesCaughtUp = Promise.all([...servers.map(({channels}) => {
-        const textChannels = channels.filter(c => c.type === 'text');
+    const caughtUp = Promise.all([...servers.map(({channels}) => {
+        const textChannels = channels.getAll('type', 'text');
         return textChannels.map(c => messageSaver.catchUp(c));
     })]);
 
     // Text channels catching up
-    Promise.all([timelinesReady, messagesCaughtUp]).then(() => {
+    Promise.all([timelinesReady, caughtUp]).then(() => {
         loggy.log(`${Emoji.WHEW} Whew, it's all over`);
     });
+
+    registerEvents();
 }
 
 
@@ -484,7 +510,4 @@ process.on('uncaughtException', (error) => {
 function login() {
     client.loginWithToken(config.get('discord.token') + '');
 }
-client.on('disconnected', () => {
-    login();
-});
 login();

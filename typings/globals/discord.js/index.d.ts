@@ -210,6 +210,10 @@ declare module 'discord.js' {
 
     export class Cache<T> extends Array {
         get(key, value): T;
+
+        // MICHAEL WAS HERE
+        get(value): T;
+
         getAll(key, value): Cache<T>;
         has(key, value): boolean;
         add(data): void;
