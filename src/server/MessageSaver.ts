@@ -108,7 +108,7 @@ export default class MessageSaver {
             .then(messages => {
                 const count = messages.length;
                 // Early out if no messages remain
-                if (count === 0) return `reached creation ` +
+                if (count === 0) return `hit creation ` +
                     `after ${total}`;
 
                 const earliestMessage = messages[count - 1];
@@ -129,7 +129,7 @@ export default class MessageSaver {
 
             // Earliest message given by Discord is already on record
             const more = onlineMessages.hasChild(earliestMessage.id)
-                ? `recognized message from ` +
+                ? `recognized ` +
                   `${messageDate(earliestMessage)}` +
                   ` after ${total}`
                 : getDiscordMessages(earliestMessage);
