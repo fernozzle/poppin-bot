@@ -57,7 +57,7 @@ export default class StateTimeline {
             firebase.database.ServerValue.TIMESTAMP);
         allProps[Keys.ACCESS] = Status.ONLINE;
 
-        const now = Date.now();
+        const time = Date.now();
         this.gotReady = firebase.Promise.all([
             this.asOfRef.once('value'), // Time last left
             this.root.child(this.stateID()).once('value')
@@ -91,10 +91,15 @@ export default class StateTimeline {
                 // and old keys that don't exist anymore
                 ...deltaKeys(this.state, allProps)
             ]; // Many duplicates, doesn't matter with mapObject
-            this.buildEvent(
-                allProps, this.state,
-                changedKeys, now, null,
-                updateObject);
+            this.buildEvent({
+                newProps: allProps,
+                oldProps: this.state,
+                changedKeys,
+                time,
+                // A new timeline is previously all-NONE
+                // Just omit those NONEs as a shorthand
+                oldNone: oldTime ? NONE : null,
+                updateObject});
 
             applyProps(allProps, this.state, changedKeys);
             return this.root.update(updateObject);
@@ -105,9 +110,12 @@ export default class StateTimeline {
         return this.gotReady.then(() => {
             const changedKeys = deltaKeys(newProps, this.state);
             console.log(changedKeys.map(key => key + ':\n  ' + this.state[key] + ' => ' + newProps[key]).join('\n'));
-            const updateObject = this.buildEvent(
-                newProps, this.state,
-                changedKeys, time, NONE);
+            const updateObject = this.buildEvent({
+                newProps,
+                oldProps: this.state,
+                changedKeys,
+                time,
+                oldNone: NONE});
 
             applyProps(newProps, this.state, changedKeys);
             return this.root.update(updateObject);
@@ -125,15 +133,23 @@ export default class StateTimeline {
     }
 
 
-    private buildEvent(
-        newProps:{}, oldProps:{}, keys:string[],
-        time:number, oldNone, updateObject = {}) {
+    private buildEvent({
+        newProps, oldProps, changedKeys, time,
+        oldNone, updateObject = {}
+    }: {
+        newProps:{},
+        oldProps:{},
+        changedKeys:string[],
+        time:number,
+        oldNone: number | string,
+        updateObject?:{}
+    }) {
 
-        mapObject(keys,
+        mapObject(changedKeys,
             key => this.eventID(key, time),
             key => fallback(oldProps[key], oldNone),
             updateObject);
-        return mapObject(keys,
+        return mapObject(changedKeys,
             key => this.stateID(key),
             key => fallback(newProps[key], null),
             updateObject);
