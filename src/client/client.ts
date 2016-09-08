@@ -32,38 +32,31 @@ const canvas = container.select('canvas')
     .style('height', rect => `${rect.height}px`);
 
 const gl = canvas.node().getContext('webgl') as WebGLRenderingContext;
-const buffer = gl.createBuffer();
-gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-    -1, -1,
-     1, -1,
-    -1,  1,
 
-     1, -1,
-     1,  1,
-    -1,  1
+const attrBuffer = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, attrBuffer);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+    -1, -1,  1, 0, 0,
+    -1, +1,  1, 1, 0,
+    +1, +1,  0, 1, 0,
+    +1, -1,  0, 0, 1,
 ]), gl.STATIC_DRAW);
-const program = createProgram(`
-    attribute vec3 position;
-    void main() {
-        gl_Position = vec4( position, 1.0 );
-    }
-`, `
-    #ifdef GL_ES
-        precision highp float;
-    #endif
-    uniform float time;
-    uniform vec2 resolution;
-    void main( void ) {
-        vec2 position = - 1.0 + 2.0 * gl_FragCoord.xy / resolution.xy;
-        float red =   abs( sin( position.x * position.y + time / 5.0 ) );
-        float green = abs( sin( position.x * position.y + time / 4.0 ) );
-        float blue =  abs( sin( position.x * position.y + time / 3.0 ) );
-        gl_FragColor = vec4( red, green, blue, 1.0 );
-    }
-`);
-const timeLoc = gl.getUniformLocation(program, 'time'      );
-const resoLoc = gl.getUniformLocation(program, 'resolution');
+
+const indexBuffer = gl.createBuffer();
+gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Int8Array([
+    0, 1, 2,
+    2, 3, 0
+]), gl.STATIC_DRAW);
+
+const program = createProgram(
+    require('./shader/bubble.vs'),
+    require('./shader/bubble.fs'));
+const aPosLoc   = gl.getAttribLocation (program, 'aPos');
+const aColorLoc = gl.getAttribLocation (program, 'aColor');
+
+const uTimeLoc  = gl.getUniformLocation(program, 'uTime');
+const uResLoc   = gl.getUniformLocation(program, 'uRes');
 const start = Date.now();
 
 animate();
@@ -78,18 +71,22 @@ function render() {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
     gl.useProgram(program);
-    gl.uniform1f(timeLoc,
+    gl.uniform1f(uTimeLoc,
         (Date.now() - start) / 1000);
-    gl.uniform2f(resoLoc,
+    gl.uniform2f(uResLoc,
         +canvas.attr('width'),
         +canvas.attr('height'));
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    const vertexPosition = 0;
-    gl.vertexAttribPointer(vertexPosition, 2, gl.FLOAT, false, 0, 0);
-    gl.enableVertexAttribArray(vertexPosition);
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
-    gl.disableVertexAttribArray(vertexPosition);
+    gl.bindBuffer(gl.ARRAY_BUFFER,         attrBuffer);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+
+    gl.vertexAttribPointer(aPosLoc,   2, gl.FLOAT, false, 20, 0);
+    gl.vertexAttribPointer(aColorLoc, 3, gl.FLOAT, false, 20, 8);
+    gl.enableVertexAttribArray(aPosLoc);
+    gl.enableVertexAttribArray(aColorLoc);
+    gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_BYTE, 0);
+    gl.disableVertexAttribArray(aPosLoc);
+    gl.disableVertexAttribArray(aColorLoc);
 }
 
 function createProgram(vertex:string, fragment:string) {
@@ -127,4 +124,4 @@ function createShader(source:string, type:number) {
     return shader;
 }
 
-console.log(`Hey here's a random person: ${Emoji.randomHuman()}`);
+console.log(`People watching you:\n${d3.range(100).map(Emoji.randomHuman.bind(Emoji)).join('')}`);
