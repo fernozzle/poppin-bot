@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "description": "Discord bot to see what rooms are poppin",
   "scripts": {
-    "build-client": "webpack --config client-building/webpack.config.js",
+    "build-client": "webpack --config client-webpack.config.js",
+    "build-client-watch": "webpack --config client-webpack.config.js --watch",
     "build-server": "tsc --project . && echo Done",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
