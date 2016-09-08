@@ -1,11 +1,10 @@
-{
+{ // Client
     "compilerOptions": {
-        "watch": true,
+        "watch": false,
         "removeComments": true,
-        "target": "es6",
+        "target": "es5",
 
-        "rootDir": "./src",
-        "outDir": "./build",
+        "rootDir": "src",
         "sourceMap": true,
         "module": "commonjs"
     }

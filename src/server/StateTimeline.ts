@@ -1,5 +1,5 @@
 import * as firebase from 'firebase';
-import {mapObject} from './Util'
+import {mapObject} from '../core/Util'
 
 /**
  * Returns `optional` but `fallback` when it's undefined/null

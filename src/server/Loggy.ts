@@ -3,7 +3,7 @@ import * as config from 'config';
 import * as util from 'util';
 
 import Messager from './Messager';
-import Emoji from './Emoji';
+import Emoji from '../core/Emoji';
 
 const consoleLog   = console.log.bind(console);
 const consoleError = console.error.bind(console);

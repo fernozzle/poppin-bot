@@ -1,8 +1,8 @@
 import * as Discord from 'discord.js';
 import * as firebase from 'firebase';
-import {mapObject} from './Util'
+import {mapObject} from '../core/Util'
 import Loggy from './Loggy';
-import Emoji from './Emoji';
+import Emoji from '../core/Emoji';
 const swearFilter = new (require('bad-words'))();
 
 type Mess = Discord.Message;
@@ -68,7 +68,7 @@ export default class MessageSaver {
         updateObject[base + '/pin'] = message.pinned || null;
         updateObject[base + '/tts'] = message.tts    || null;
 
-        if (message.embeds) {
+        if (message.embeds && false) {
             console.dir(message.embeds);
         }
 
@@ -108,14 +108,10 @@ export default class MessageSaver {
             .then(messages => {
                 const count = messages.length;
                 // Early out if no messages remain
-                if (count === 0) return `reached the ` +
-                    `beginning of time after ${total} messages`;
+                if (count === 0) return `reached creation ` +
+                    `after ${total}`;
 
                 const earliestMessage = messages[count - 1];
-                this.loggy.log(
-                    `${Emoji.LOGS} Got ${before ? 'another' : 'latest'} ` +
-                    `${count} (${total + count} total) from ${name}: ` +
-                    messageDate(earliestMessage));
 
                 // Step 2: check Firebase for these messages
                 return messageQuery
@@ -133,27 +129,34 @@ export default class MessageSaver {
 
             // Earliest message given by Discord is already on record
             const more = onlineMessages.hasChild(earliestMessage.id)
-                ? `recognized a message from ` +
+                ? `recognized message from ` +
                   `${messageDate(earliestMessage)}` +
-                  ` after ${total} messages`
+                  ` after ${total}`
                 : getDiscordMessages(earliestMessage);
 
-            // Don't overwrite already uploaded messages (it'd discard edits)
+            // Don't overwrite already online messages (it'd discard edits)
             const offlineMessages = discordMessages.filter(
                  ({id}) => !onlineMessages.hasChild(id));
-            total += offlineMessages.length;
+            const offlineCount = offlineMessages.length;
+            total += offlineCount;
 
-            // Discard uploadMessage's return value (null on success)
-            const promises = [more, this.messagesPosted(...offlineMessages)];
-            return Promise.all(promises).then(([more]) => more);
+            const upload = this.messagesPosted(...offlineMessages).then(
+                () => (offlineCount > 0) ? this.loggy.log(
+                    `${Emoji.LOGS} Kept ${offlineCount} ` +
+                    `(${total} total) from ${name}: ` +
+                    `${messageDate(earliestMessage)}`) : null);
+
+            // Discard uploadMessage's return value
+            return Promise.all([more, upload]).then(([more]) => more);
         };
 
         let total = 0;
         const messageQuery = this.root.child(
             serverID(NS.BASE, channel)).orderByKey();
+        const name = channelName(channel);
 
         return getDiscordMessages().then(note => this.loggy.log(
-            `${Emoji.UPLOAD_MESSAGE} Done catching up in ${name}: ${note}`)
+            `${Emoji.UPLOAD_MESSAGE} Caught up ${name}: ${note}`)
         ).catch(error => this.loggy.error(
             `Error getting logs on ${name} ${Emoji.MORE}`, error));
     }

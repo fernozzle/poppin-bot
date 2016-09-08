@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "description": "Discord bot to see what rooms are poppin",
   "scripts": {
+    "build-client": "webpack --config client-building/webpack.config.js",
+    "build-server": "tsc --project . && echo Done",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -16,9 +18,17 @@
   },
   "homepage": "https://github.com/fernozzle/poppin-bot#readme",
   "dependencies": {
+    "bad-words": "^1.4.2",
     "config": "^1.21.0",
     "discord.js": "^8.0.0",
     "firebase": "^3.1.0",
-    "pkginfo": "^0.4.0"
+    "pkginfo": "^0.4.0",
+    "source-map-support": "^0.4.2",
+    "ts-loader": "^0.8.2",
+    "webpack": "^1.13.2"
+  },
+  "devDependencies": {
+    "typescript": "^1.8.10",
+    "webpack-uglify-js-plugin": "^1.1.9"
   }
 }

@@ -6,8 +6,8 @@ import * as util from 'util';
 const pkginfo = require('pkginfo')(module);
 const swearFilter = new (require('bad-words'))();
 
-import {pick, mapObject} from './Util'
-import Emoji from './Emoji';
+import {pick, mapObject} from '../core/Util'
+import Emoji from '../core/Emoji';
 import Messager from './Messager';
 import Loggy from './Loggy';
 import StateTimeline from './StateTimeline';
@@ -364,9 +364,8 @@ function registerEvents() {
         //loggy.log(`Aww ${channel.name} just saw ${user.name} stop typing`);
     });*/
 
-    client.on('serverUpdated', (oldServer, newServer) => {
-        timelines.get(newServer).update(
-            objectifyServer(newServer));
+    client.on('serverUpdated', (old, server) => {
+        timelines.get(server).update(objectifyServer(server));
     });
     client.on('channelCreated', (channel:Discord.ServerChannel) => {
         if (channel.server) timelines.get(channel.server).update(
@@ -491,7 +490,8 @@ function init(logServer:Discord.Server) {
 
     const caughtUp = Promise.all([...servers.map(({channels}) => {
         const textChannels = channels.getAll('type', 'text');
-        return textChannels.map(c => messageSaver.catchUp(c));
+        const promises = textChannels.map(c => messageSaver.catchUp(c));
+        return Promise.all([...promises]);
     })]);
 
     // Text channels catching up

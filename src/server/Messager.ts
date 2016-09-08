@@ -1,5 +1,5 @@
 import * as Discord from 'discord.js';
-import Emoji from './Emoji'
+import Emoji from '../core/Emoji'
 
 interface PendingMessage {
     completed?: boolean;
