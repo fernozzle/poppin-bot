@@ -1,6 +1,15 @@
 import Emoji from '../core/Emoji';
 import * as firebase from 'firebase';
 declare const d3: any;
+declare const CCapture: any;
+
+var capturer = new CCapture({
+    format: 'gif',
+    workersPath: 'js/',
+    verbose: true,
+    framerate: 30
+});
+capturer.start();
 /*
 // Initialize Firebase
 var config = {
@@ -24,7 +33,7 @@ root.child(`messages/base/${serverID}`).orderByKey().limitToLast(100)
 
 const dpr = window.devicePixelRatio;
 const container = d3.select('#container')
-    .datum((d, i, s) => s[i].getBoundingClientRect());
+    .datum((d, i, s) => ({width: 400, height: 300} || s[i].getBoundingClientRect()));
 const canvas = container.select('canvas')
     .property('width',  rect => rect.width  * dpr)
     .property('height', rect => rect.height * dpr)
@@ -49,15 +58,41 @@ gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Int8Array([
     2, 3, 0
 ]), gl.STATIC_DRAW);
 
-const program = createProgram(
-    require('./shader/bubble.vs'),
-    require('./shader/bubble.fs'));
-const aPositionLoc = gl.getAttribLocation (program, 'aPosition');
+const dotCount = 9;
+const dotBuffer = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, dotBuffer);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+    0, 1,
+    0, 2,
 
+    1, 1,
+    1, 2,
+    1, 3,
+    1, 4,
+
+    2, 1,
+    2, 2,
+    2, 3,
+]), gl.STATIC_DRAW);
+const instanceExt = gl.getExtension('ANGLE_instanced_arrays');
+
+const program = createProgram(
+    require('./shader/dot.vs'),
+    require('./shader/dot.fs'));
+// Uniform
 const uResolutionLoc = gl.getUniformLocation(program, 'uResolution');
-const uBubbleStrideLoc = gl.getUniformLocation(program, 'uBubbleStride');
-const uBubbleCoordLoc = gl.getUniformLocation(program, 'uBubbleCoord');
-const start = Date.now();
+const uDotStrideLoc = gl.getUniformLocation(program, 'uDotStride');
+const uDotSizeLoc = gl.getUniformLocation(program, 'uDotSize');
+// Instancing
+const uDotCoordLoc = gl.getAttribLocation(program, 'uDotCoord');
+// Attribute
+const aPositionLoc = gl.getAttribLocation(program, 'aPosition');
+gl.clearColor(.93, .93, .93, 1.);
+gl.disable(gl.BLEND);
+
+//const start = Date.now();
+let time = 0;
+let gotten = false;
 
 animate();
 
@@ -68,25 +103,52 @@ function animate() {
 function render() {
     if (!program) return;
 
-    const time = (Date.now() - start) / 1000;
+    time += 1 / 30;
+    //const time = (Date.now() - start) / 1000;
 
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
     gl.useProgram(program);
+
+    // Index buffer
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+
+    // Uniforms
     gl.uniform2f(uResolutionLoc,
         canvas.node().width,
         canvas.node().height);
-    gl.uniform1f(uBubbleStrideLoc, 100 * dpr + 50 * Math.sin(time * 10));
-    gl.uniform2f(uBubbleCoordLoc, 0, 0);
+    gl.uniform1f(uDotStrideLoc, 100 * dpr + 5 * Math.sin(time * 5));
+    gl.uniform1f(uDotSizeLoc, .5 * dpr + .1 * Math.sin(time * 7));
 
+    instanceExt.vertexAttribDivisorANGLE(aPositionLoc, 0);
+    instanceExt.vertexAttribDivisorANGLE(uDotCoordLoc, 0);
+    // Attributes
     gl.bindBuffer(gl.ARRAY_BUFFER, attrBuffer);
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-
+    gl.enableVertexAttribArray(aPositionLoc);
     gl.vertexAttribPointer(aPositionLoc, 2, gl.FLOAT, false, 0, 0);
 
-    gl.enableVertexAttribArray(aPositionLoc);
-    gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_BYTE, 0);
+    // Instancing
+    gl.bindBuffer(gl.ARRAY_BUFFER, dotBuffer);
+    gl.enableVertexAttribArray(uDotCoordLoc);
+    gl.vertexAttribPointer(uDotCoordLoc, 2, gl.FLOAT, false, 0, 0);
+    instanceExt.vertexAttribDivisorANGLE(uDotCoordLoc, 1);
+
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    instanceExt.drawElementsInstancedANGLE(gl.TRIANGLES, 6, gl.UNSIGNED_BYTE, 0, dotCount);
+
     gl.disableVertexAttribArray(aPositionLoc);
+    gl.disableVertexAttribArray(uDotCoordLoc);
+
+    capturer.capture(canvas.node());
+
+    if (time > Math.PI * 2) {
+        if (!gotten) {
+            capturer.stop();
+            capturer.save();
+            gotten = true;
+        }
+    } else {
+        capturer.capture();
+    }
 }
 
 
