@@ -1,9 +1,19 @@
-attribute vec2 aPos;
-attribute vec3 aColor;
+// uniform
+uniform vec2 uResolution;
+uniform float uBubbleStride;
 
-varying vec3 vColor;
+// instance
+uniform vec2 uBubbleCoord;
+
+// vertex
+attribute vec2 aPosition;
+
+// fragment
+varying vec2 vPosition;
 
 void main() {
-    vColor = aColor;
-    gl_Position = vec4(aPos, 0., 1.);
+    vPosition = aPosition;
+
+    vec2 pos = uBubbleStride * (uBubbleCoord + aPosition * .8) / uResolution;
+    gl_Position = vec4(pos, 0., 1.);
 }
