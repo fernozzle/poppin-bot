@@ -25,15 +25,17 @@ export default class Messager {
     }
 
     send(cesque: Channelesque, text:string) {
-        const pend = this._pendingChannels.get(cesque)
+        const pend:PendingMessage = this._pendingChannels.get(cesque)
             || {latestCompletes: Promise.resolve()};
         if (!pend.arrive) this._pendingChannels.set(cesque, pend);
 
         // Tack on a `then` to the current promise
-        return pend.latestCompletes = pend.latestCompletes.then(() => new Promise(resolve => {
+        return pend.latestCompletes = pend.latestCompletes
+        .then(() => new Promise((resolve, reject) => {
             // When the previous promise is resolved, send the message and
             // allow recieved messages to await its ID so they can compare with it
-            pend.getsId = this._client.sendMessage(cesque, text).then(({id}) => id);
+            pend.getsId = this._client.sendMessage(cesque, text)
+                .then(({id}) => id).catch(reject);
             // It's up to them to call this if they're the lucky one
             pend.arrive = message => {
                 pend.completed = true;
@@ -41,8 +43,7 @@ export default class Messager {
             };
             pend.completed = false;
         })).catch(error => {
-            console.error(`Couldn't pend ${text} ${Emoji.MORE}`);
-            console.dir(error);
+            console.error(`Couldn't send "${text}" ${Emoji.MORE}\n  ${error}`);
         });
     }
 

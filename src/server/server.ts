@@ -475,7 +475,6 @@ function init(logServer:Discord.Server) {
 
     const timeString = (new Date()).toLocaleString();
     loggy.log(`${Emoji.STAR} Logged on ${timeString} ${Emoji.STAR}`);
-    //console.dir(client);
 
     const servers = client.servers;
     const timelinesReady = Promise.all([...servers.map(server => {
@@ -488,13 +487,13 @@ function init(logServer:Discord.Server) {
     )).catch(error => loggy.error(
         `Error uploading servers ${Emoji.MORE}`, error));
 
+    // Text channels catching up
     const caughtUp = Promise.all([...servers.map(({channels}) => {
         const textChannels = channels.getAll('type', 'text');
         const promises = textChannels.map(c => messageSaver.catchUp(c));
         return Promise.all([...promises]);
     })]);
 
-    // Text channels catching up
     Promise.all([timelinesReady, caughtUp]).then(() => {
         loggy.log(`${Emoji.WHEW} Whew, it's all over`);
     });
