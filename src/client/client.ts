@@ -44,7 +44,7 @@ let dotCount = 0;
 
 const dotBuffer = gl.createBuffer();
 gl.bindBuffer(gl.ARRAY_BUFFER, dotBuffer);
-gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(DOT_LIMIT * 2), gl.STATIC_DRAW);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(DOT_LIMIT * 3), gl.STATIC_DRAW);
 
 const instanceExt = gl.getExtension('ANGLE_instanced_arrays');
 
@@ -53,10 +53,12 @@ const program = createProgram(
     require('./shader/dot.fs'));
 // Uniform
 const uResolutionLoc = gl.getUniformLocation(program, 'uResolution');
+const uTimeLoc = gl.getUniformLocation(program, 'uTime');
 const uDotStrideLoc = gl.getUniformLocation(program, 'uDotStride');
 const uOffsetLoc = gl.getUniformLocation(program, 'uOffset');
 // Instancing
-const uDotCoordLoc = gl.getAttribLocation(program, 'uDotCoord');
+const aDotCoordLoc = gl.getAttribLocation(program, 'aDotCoord');
+const aDotTimeLoc = gl.getAttribLocation(program, 'aDotTime');
 // Attribute
 const aPositionLoc = gl.getAttribLocation(program, 'aPosition');
 gl.clearColor(.1, .1, .1, 1.0);
@@ -85,6 +87,7 @@ function render() {
     gl.uniform2f(uResolutionLoc,
         canvas.node().width  / dpr,
         canvas.node().height / dpr);
+    gl.uniform1f(uTimeLoc, time);
     gl.uniform1f(uDotStrideLoc, DOT_STRIDE + 1 * Math.sin(time * 5));
     gl.uniform2f(uOffsetLoc, 100, 100);
 
@@ -95,15 +98,18 @@ function render() {
 
     // Instancing
     gl.bindBuffer(gl.ARRAY_BUFFER, dotBuffer);
-    gl.enableVertexAttribArray(uDotCoordLoc);
-    gl.vertexAttribPointer(uDotCoordLoc, 2, gl.FLOAT, false, 0, 0);
-    instanceExt.vertexAttribDivisorANGLE(uDotCoordLoc, 1);
+    gl.enableVertexAttribArray(aDotCoordLoc);
+    gl.enableVertexAttribArray(aDotTimeLoc );
+    gl.vertexAttribPointer(aDotCoordLoc, 2, gl.FLOAT, false, 3 * 4, 0 * 4);
+    gl.vertexAttribPointer(aDotTimeLoc,  1, gl.FLOAT, false, 3 * 4, 2 * 4);
+    instanceExt.vertexAttribDivisorANGLE(aDotCoordLoc, 1);
+    instanceExt.vertexAttribDivisorANGLE(aDotTimeLoc,  1);
 
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     instanceExt.drawElementsInstancedANGLE(gl.TRIANGLES, 6, gl.UNSIGNED_BYTE, 0, DOT_LIMIT);
 
     gl.disableVertexAttribArray(aPositionLoc);
-    gl.disableVertexAttribArray(uDotCoordLoc);
+    gl.disableVertexAttribArray(aDotCoordLoc);
 }
 
 function createProgram(vertex:string, fragment:string) {
@@ -159,10 +165,10 @@ console.log(`backTime: ${new Date(backTime)}`);
 const serverID = '199257044161789952';
 root.child(`messages/base/${serverID}`).orderByChild('time').startAt(backTime)
 .once('value', messagesSnap => {
-    const size = 2;
+    const size = 3;
     const newData = new Float32Array(messagesSnap.numChildren() * size);
 
-    let offset = 0;
+    let index = 0;
     messagesSnap.forEach(messageSnap => {
         const message = messageSnap.val();
 
@@ -173,13 +179,16 @@ root.child(`messages/base/${serverID}`).orderByChild('time').startAt(backTime)
         } else {
             currentRow++;
         }
+        const offset = index * size;
         newData[offset + 0] = currentCol;
         newData[offset + 1] = currentRow;
-        offset += size;
+        newData[offset + 2] = time + index * .03;
+        index++;
 
+        /*
         root.child(`messages/text/${serverID}/${messageSnap.key}`).once('value').then(textSnap => {
             console.log(`"${textSnap.val()}" ${new Date(message.time)}`);
-        });
+        });*/
         return false;
     });
     gl.bindBuffer(gl.ARRAY_BUFFER, dotBuffer);

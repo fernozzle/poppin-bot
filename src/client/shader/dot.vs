@@ -1,10 +1,12 @@
 // uniform
 uniform vec2 uResolution;
+uniform float uTime;
 uniform float uDotStride;
 uniform vec2 uOffset;
 
 // instance
-attribute vec2 uDotCoord;
+attribute vec2 aDotCoord;
+attribute float aDotTime;
 
 // vertex
 attribute vec2 aPosition;
@@ -15,6 +17,7 @@ varying vec2 vPosition;
 void main() {
     vPosition = aPosition;
 
-    vec2 pos = (uDotStride * (uDotCoord + aPosition * .4) + uOffset) / uResolution - vec2(1., 1.);
-    gl_Position = vec4(pos, 0., 1.);
+    float radius = .4 * smoothstep(.0, .6, uTime - aDotTime);
+    vec2 pos = uDotStride * (aDotCoord + aPosition * radius) + uOffset; // In pixels
+    gl_Position = vec4(pos / uResolution - 1., 0., 1.);
 }
