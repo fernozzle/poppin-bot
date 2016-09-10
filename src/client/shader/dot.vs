@@ -17,7 +17,8 @@ varying vec2 vPosition;
 void main() {
     vPosition = aPosition;
 
-    float radius = .4 * smoothstep(.0, .6, uTime - aDotTime);
+    float fac = smoothstep(1., .0, uTime - aDotTime);
+    float radius = step(.001, aDotTime) * .4 * (1. - fac * fac * fac * fac * fac);
     vec2 pos = uDotStride * (aDotCoord + aPosition * radius) + uOffset; // In pixels
     gl_Position = vec4(pos / uResolution - 1., 0., 1.);
 }
