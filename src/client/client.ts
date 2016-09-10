@@ -3,6 +3,7 @@ import * as firebase from 'firebase';
 declare const d3: any;
 
 const DOT_STRIDE = 30;
+const DOT_LIMIT = 1000;
 const COL_TIME = 5 * 60 * 1000;
 
 const dpr = window.devicePixelRatio;
@@ -37,22 +38,14 @@ gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Int8Array([
     2, 3, 0
 ]), gl.STATIC_DRAW);
 
-const dotCount = 9;
+let currentCol = Number.NEGATIVE_INFINITY;
+let currentRow = 0;
+let dotCount = 0;
+
 const dotBuffer = gl.createBuffer();
 gl.bindBuffer(gl.ARRAY_BUFFER, dotBuffer);
-gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-    0, 0,
-    0, 1,
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(DOT_LIMIT * 2), gl.STATIC_DRAW);
 
-    1, 0,
-    1, 1,
-    1, 2,
-    1, 3,
-
-    2, 0,
-    2, 1,
-    2, 2,
-]), gl.STATIC_DRAW);
 const instanceExt = gl.getExtension('ANGLE_instanced_arrays');
 
 const program = createProgram(
@@ -66,10 +59,11 @@ const uOffsetLoc = gl.getUniformLocation(program, 'uOffset');
 const uDotCoordLoc = gl.getAttribLocation(program, 'uDotCoord');
 // Attribute
 const aPositionLoc = gl.getAttribLocation(program, 'aPosition');
-gl.clearColor(.1, .1, .1, 1.);
+gl.clearColor(.1, .1, .1, 1.0);
 gl.enable(gl.BLEND);
 
 const start = Date.now();
+let time = start;
 
 animate();
 function animate() {
@@ -79,7 +73,7 @@ function animate() {
 function render() {
     if (!program) return;
 
-    const time = (Date.now() - start) / 1000;
+    time = (Date.now() - start) / 1000;
 
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.useProgram(program);
@@ -94,8 +88,6 @@ function render() {
     gl.uniform1f(uDotStrideLoc, DOT_STRIDE + 1 * Math.sin(time * 5));
     gl.uniform2f(uOffsetLoc, 100, 100);
 
-    instanceExt.vertexAttribDivisorANGLE(aPositionLoc, 0);
-    instanceExt.vertexAttribDivisorANGLE(uDotCoordLoc, 0);
     // Attributes
     gl.bindBuffer(gl.ARRAY_BUFFER, attrBuffer);
     gl.enableVertexAttribArray(aPositionLoc);
@@ -108,7 +100,7 @@ function render() {
     instanceExt.vertexAttribDivisorANGLE(uDotCoordLoc, 1);
 
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-    instanceExt.drawElementsInstancedANGLE(gl.TRIANGLES, 6, gl.UNSIGNED_BYTE, 0, dotCount);
+    instanceExt.drawElementsInstancedANGLE(gl.TRIANGLES, 6, gl.UNSIGNED_BYTE, 0, DOT_LIMIT);
 
     gl.disableVertexAttribArray(aPositionLoc);
     gl.disableVertexAttribArray(uDotCoordLoc);
@@ -167,11 +159,29 @@ console.log(`backTime: ${new Date(backTime)}`);
 const serverID = '199257044161789952';
 root.child(`messages/base/${serverID}`).orderByChild('time').startAt(backTime)
 .once('value', messagesSnap => {
+    const size = 2;
+    const newData = new Float32Array(messagesSnap.numChildren() * size);
+
+    let offset = 0;
     messagesSnap.forEach(messageSnap => {
+        const message = messageSnap.val();
+
+        const col = Math.floor((message.time - backTime) / COL_TIME);
+        if (col !== currentCol) {
+            currentCol = col;
+            currentRow = 0;
+        } else {
+            currentRow++;
+        }
+        newData[offset + 0] = currentCol;
+        newData[offset + 1] = currentRow;
+        offset += size;
+
         root.child(`messages/text/${serverID}/${messageSnap.key}`).once('value').then(textSnap => {
-            console.log(`"${textSnap.val()}" ${new Date(messageSnap.val().time)}`);
+            console.log(`"${textSnap.val()}" ${new Date(message.time)}`);
         });
         return false;
     });
-    //console.log(snap.val());
+    gl.bindBuffer(gl.ARRAY_BUFFER, dotBuffer);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, newData);
 });
