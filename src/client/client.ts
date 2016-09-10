@@ -6,6 +6,9 @@ const DOT_STRIDE = 30;
 const DOT_LIMIT = 1000;
 const COL_TIME = 5 * 60 * 1000;
 
+const ATLAS_SIZE = 2048;
+const AVATAR_SIZE = 32;
+
 const dpr = window.devicePixelRatio;
 const container = d3.select('#container');
 const rect = container.node().getBoundingClientRect();
@@ -165,6 +168,8 @@ console.log(`backTime: ${new Date(backTime)}`);
 const serverID = '199257044161789952';
 root.child(`messages/base/${serverID}`).orderByChild('time').startAt(backTime)
 .once('value', messagesSnap => {
+    // Upload new data dot buffer ===============
+
     const size = 3;
     const newData = new Float32Array(messagesSnap.numChildren() * size);
 
@@ -185,12 +190,54 @@ root.child(`messages/base/${serverID}`).orderByChild('time').startAt(backTime)
         newData[offset + 2] = time + index * .03;
         index++;
 
-        /*
-        root.child(`messages/text/${serverID}/${messageSnap.key}`).once('value').then(textSnap => {
+        /*root.child(`messages/text/${serverID}/${messageSnap.key}`).once('value').then(textSnap => {
             console.log(`"${textSnap.val()}" ${new Date(message.time)}`);
         });*/
         return false;
     });
     gl.bindBuffer(gl.ARRAY_BUFFER, dotBuffer);
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, newData);
+
+    // Make avatar atlas ===============
+    const atlasCanvas = d3.select('#atlas-container > canvas')
+        .property('width',  ATLAS_SIZE)
+        .property('height', ATLAS_SIZE)
+        .style   ('width',  `${ATLAS_SIZE / dpr}px`)
+        .style   ('height', `${ATLAS_SIZE / dpr}px`)
+        .node();
+    const atlasContext:CanvasRenderingContext2D =
+        atlasCanvas.getContext('2d');
+    let currentX = 0;
+    let currentY = 0;
+
+    const usersRequested = {};
+    messagesSnap.forEach(messageSnap => {
+        const {user} = messageSnap.val();
+        if (usersRequested[user]) return false;
+
+        const id = `timelines/state/${serverID}/member-${user}:icon`;
+        root.child(id).once('value')
+        .then(urlSnap => new firebase.Promise((resolve, reject) => {
+            const avatar = new Image();
+            avatar.onload  = e => resolve(avatar);
+            avatar.onerror = reject;
+            avatar.src = urlSnap.val();
+        })).then((avatar:HTMLImageElement) => {
+            atlasContext.drawImage(avatar,
+                currentX * AVATAR_SIZE, currentY * AVATAR_SIZE,
+                AVATAR_SIZE, AVATAR_SIZE);
+            currentX++;
+            if (currentX >= Math.floor(ATLAS_SIZE / AVATAR_SIZE)) {
+                currentX = 0;
+                currentY++;
+            }
+        }).catch((event:Event) => {
+            console.group('Error loading avatar:');
+            console.error(event);
+            console.groupEnd();
+        });
+        usersRequested[user] = true;
+
+        return false;
+    });
 });
