@@ -197,32 +197,37 @@ root.child(`messages/base/${serverID}`).orderByChild('time').startAt(backTime)
     });
     gl.bindBuffer(gl.ARRAY_BUFFER, dotBuffer);
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, newData);
+});
 
-    // Make avatar atlas ===============
-    const atlasCanvas = d3.select('#atlas-container > canvas')
-        .property('width',  ATLAS_SIZE)
-        .property('height', ATLAS_SIZE)
-        .style   ('width',  `${ATLAS_SIZE / dpr}px`)
-        .style   ('height', `${ATLAS_SIZE / dpr}px`)
-        .node();
-    const atlasContext:CanvasRenderingContext2D =
-        atlasCanvas.getContext('2d');
-    let currentX = 0;
-    let currentY = 0;
 
-    const usersRequested = {};
-    messagesSnap.forEach(messageSnap => {
-        const {user} = messageSnap.val();
+// Make avatar atlas ===============
+const atlasCanvas = d3.select('#atlas-container > canvas')
+    .property('width',  ATLAS_SIZE)
+    .property('height', ATLAS_SIZE)
+    .style   ('width',  `${ATLAS_SIZE / dpr}px`)
+    .style   ('height', `${ATLAS_SIZE / dpr}px`)
+    .node();
+const atlasContext:CanvasRenderingContext2D =
+    atlasCanvas.getContext('2d');
+let currentX = 0;
+let currentY = 0;
+
+const usersRequested = {};
+root.child(`timelines/state/${serverID}`).once('value').then(stateSnap => {
+    stateSnap.forEach((propSnap:firebase.database.DataSnapshot) => {
+
+        const match = propSnap.key.match(/^member-([0-9]+):icon$/);
+        if (!match) return false;
+
+        const user = match[1];
         if (usersRequested[user]) return false;
 
-        const id = `timelines/state/${serverID}/member-${user}:icon`;
-        root.child(id).once('value')
-        .then(urlSnap => new firebase.Promise((resolve, reject) => {
+        new firebase.Promise((resolve, reject) => {
             const avatar = new Image();
             avatar.onload  = e => resolve(avatar);
             avatar.onerror = reject;
-            avatar.src = urlSnap.val();
-        })).then((avatar:HTMLImageElement) => {
+            avatar.src = propSnap.val();
+        }).then((avatar:HTMLImageElement) => {
             atlasContext.drawImage(avatar,
                 currentX * AVATAR_SIZE, currentY * AVATAR_SIZE,
                 AVATAR_SIZE, AVATAR_SIZE);
